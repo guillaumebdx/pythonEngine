@@ -1,0 +1,14 @@
+# Environnement virtuel
+.venv/
+.idea
+venv/
+__pycache__/
+
+# Fichiers temporaires
+*.pyc
+*.pyo
+.DS_Store
+
+# Logs
+logs/
+*.log
