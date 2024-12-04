@@ -7,6 +7,9 @@ from collections import deque
 command_queue = deque()
 connected_clients = set()
 
+# Dictionnaire pour stocker les positions et états des agents
+agent_states = {}
+
 # Fonction pour gérer les messages du WebSocket
 async def echo(websocket):
     connected_clients.add(websocket)
@@ -20,17 +23,27 @@ async def echo(websocket):
                     # Ajouter la commande à la file d'attente
                     command_queue.append(data)
                     print(f"Commande ajoutée à la file : {data}")
-                elif data.get("type") == "agentData":
-                    # Gérer les données des agents
-                    agents = data.get("agents", [])
-                    print("Données des agents reçues :")
-                    for agent in agents:
-                        print(f"- Agent: {agent['agent']}")
-                        print(f"  Position: {agent['position']}")
-                        if agent.get("seesEnemy"):
-                            print(f"  Voit l'ennemi à : {agent['seesEnemy']['position']}")
-                        else:
-                            print("  Ne voit pas d'ennemi.")
+                elif data.get("type") == "agentUpdate":
+                    # Mise à jour des informations des agents
+                    agent_name = data["agent"]
+                    agent_states[agent_name] = {
+                        "position": data["position"],
+                        "seesEnemy": data.get("seesEnemy", None)
+                    }
+                    print(f"État mis à jour pour {agent_name}: {agent_states[agent_name]}")
+                elif data.get("type") == "requestState":
+                    # Envoyer l'état actuel de l'agent demandé
+                    requested_agent = data.get("agent")
+                    if requested_agent in agent_states:
+                        response = {
+                            "type": "agentState",
+                            "agent": requested_agent,
+                            "state": agent_states[requested_agent]
+                        }
+                        await websocket.send(json.dumps(response))
+                    else:
+                        response = {"type": "error", "message": f"Agent {requested_agent} inconnu"}
+                        await websocket.send(json.dumps(response))
                 else:
                     response = {"type": "echo", "message": f"Reçu : {message}"}
                     await websocket.send(json.dumps(response))
