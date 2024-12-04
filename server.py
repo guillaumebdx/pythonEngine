@@ -20,6 +20,17 @@ async def echo(websocket):
                     # Ajouter la commande à la file d'attente
                     command_queue.append(data)
                     print(f"Commande ajoutée à la file : {data}")
+                elif data.get("type") == "agentData":
+                    # Gérer les données des agents
+                    agents = data.get("agents", [])
+                    print("Données des agents reçues :")
+                    for agent in agents:
+                        print(f"- Agent: {agent['agent']}")
+                        print(f"  Position: {agent['position']}")
+                        if agent.get("seesEnemy"):
+                            print(f"  Voit l'ennemi à : {agent['seesEnemy']['position']}")
+                        else:
+                            print("  Ne voit pas d'ennemi.")
                 else:
                     response = {"type": "echo", "message": f"Reçu : {message}"}
                     await websocket.send(json.dumps(response))
