@@ -115,7 +115,7 @@ class CustomEnv(gym.Env):
             self.done = True
             if not self.blue_destroyed:
                 reward -= 20  # Pénalité pour l'échec de l'élimination
-
+            self.ws.send(json.dumps({"type": "request_reset"}))
         self.total_reward += reward
 
         # Mettre à jour le temps de la dernière étape

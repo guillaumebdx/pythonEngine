@@ -58,6 +58,13 @@ async def echo(websocket):
                 elif data.get("type") == "reset":
                     blue_destroyed = False
                     print("Réinitialisation reçue : blue_destroyed est maintenant False")
+                elif data.get("type") == "request_reset":
+                    # Diffuser un message de réinitialisation à tous les clients
+                    reset_message = {"type": "reset"}
+                    await asyncio.gather(*[
+                        client.send(json.dumps(reset_message)) for client in connected_clients
+                    ])
+                    print("Message de réinitialisation diffusé.")
                 else:
                     response = {"type": "echo", "message": f"Reçu : {message}"}
                     await websocket.send(json.dumps(response))
