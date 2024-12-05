@@ -55,6 +55,9 @@ async def echo(websocket):
                 elif data.get("type") == "checkCollision":
                     response = {"type": "collisionStatus", "blue_destroyed": blue_destroyed}
                     await websocket.send(json.dumps(response))
+                elif data.get("type") == "reset":
+                    blue_destroyed = False
+                    print("Réinitialisation reçue : blue_destroyed est maintenant False")
                 else:
                     response = {"type": "echo", "message": f"Reçu : {message}"}
                     await websocket.send(json.dumps(response))
