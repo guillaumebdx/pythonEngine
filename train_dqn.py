@@ -35,8 +35,8 @@ def preprocess_state(state):
         position_dict['z']
     ], dtype=np.float32)
     sees_enemy = np.array([state['sees_enemy']], dtype=np.float32)
-    print(f"Position: {position}, Shape: {position.shape}, Type: {type(position)}")
-    print(f"Sees Enemy: {sees_enemy}, Shape: {sees_enemy.shape}, Type: {type(sees_enemy)}")
+   # print(f"Position: {position}, Shape: {position.shape}, Type: {type(position)}")
+   # print(f"Sees Enemy: {sees_enemy}, Shape: {sees_enemy.shape}, Type: {type(sees_enemy)}")
     return np.concatenate([position, sees_enemy])
 
 
@@ -53,7 +53,7 @@ def train():
     epsilon_decay = 0.995
     learning_rate = 0.001
     max_episodes = 1000
-    max_steps = 200  # Nombre maximum d'étapes par épisode
+    max_steps = 100000  # Nombre maximum d'étapes par épisode
     target_update = 10  # Mettre à jour le réseau cible tous les 'target_update' épisodes
     memory = deque(maxlen=10000)
 
@@ -132,7 +132,7 @@ def train():
         if episode % target_update == 0:
             target_net.load_state_dict(policy_net.state_dict())
 
-        print(f"Épisode {episode}, Récompense Totale: {total_reward}, Epsilon: {epsilon}")
+        print(f"===================Épisode {episode}, Récompense Totale: {total_reward}, Epsilon: {epsilon}")
 
     # Sauvegarder le modèle entraîné
     torch.save(policy_net.state_dict(), "dqn_model.pth")

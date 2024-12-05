@@ -2,11 +2,9 @@
 import gymnasium as gym
 from gymnasium import spaces
 import numpy as np
-import websockets
-import asyncio
+import websocket
 import json
-import time  # Importer la bibliothèque time pour gérer le temps
-
+import time
 
 class CustomEnv(gym.Env):
     def __init__(self):
@@ -22,14 +20,16 @@ class CustomEnv(gym.Env):
         })
 
         # Initialisation des états
-        self.current_state = {"position": [0.0, 0.0, 0.0], "sees_enemy": 0}
+        self.current_state = {"position": {"x": 0.0, "y": 0.0, "z": 0.0}, "sees_enemy": 0}
         self.done = False
 
         # WebSocket
         self.uri = "ws://localhost:8765"
+        self.ws = websocket.create_connection(self.uri)
 
         # Gestion du temps
         self.start_time = None
+        self.last_time = None  # Ajout de last_time
         self.max_episode_duration = 20  # secondes
 
         # Variables pour les récompenses
@@ -37,7 +37,7 @@ class CustomEnv(gym.Env):
         self.sees_enemy_duration = 0
         self.blue_destroyed = False
 
-    async def _send_command(self, action):
+    def _send_command(self, action):
         command_map = {
             0: "forward",
             1: "backward",
@@ -50,51 +50,61 @@ class CustomEnv(gym.Env):
             "cube": "red",  # Contrôle du cube rouge
             "action": command_map[action]
         }
-        async with websockets.connect(self.uri) as websocket:
-            await websocket.send(json.dumps(command))
-            response = await websocket.recv()
-            # Traitement de la réponse si nécessaire
+        self.ws.send(json.dumps(command))
+        # Pas besoin d'attendre une réponse pour cette commande
 
-    async def _receive_state(self):
-        async with websockets.connect(self.uri) as websocket:
-            # Demander l'état de l'agent rouge
-            await websocket.send(json.dumps({"type": "requestState", "agent": "red"}))
-            response = await websocket.recv()
-            state = json.loads(response)
-            return state["state"]
-
-    async def _check_collision(self):
-        async with websockets.connect(self.uri) as websocket:
-            # Vérifier si le cube bleu a été détruit
-            await websocket.send(json.dumps({"type": "checkCollision"}))
-            response = await websocket.recv()
+    def _receive_state(self):
+        # Demander l'état de l'agent rouge
+        request = {"type": "requestState", "agent": "red"}
+        self.ws.send(json.dumps(request))
+        while True:
+            response = self.ws.recv()
             data = json.loads(response)
-            return data.get("blue_destroyed", False)
+            if data.get("type") == "agentState" and data.get("agent") == "red":
+                return data["state"]
+            else:
+                # Si le message n'est pas celui attendu, ignorer et continuer
+                continue
+
+    def _check_collision(self):
+        # Vérifier si le cube bleu a été détruit
+        request = {"type": "checkCollision"}
+        self.ws.send(json.dumps(request))
+        while True:
+            response = self.ws.recv()
+            data = json.loads(response)
+            if data.get("type") == "collisionStatus":
+                return data.get("blue_destroyed", False)
+            else:
+                # Si le message n'est pas celui attendu, ignorer et continuer
+                continue
 
     def step(self, action):
-        asyncio.run(self._send_command(action))
-        new_state = asyncio.run(self._receive_state())
+        self._send_command(action)
+        new_state = self._receive_state()
 
         # Mise à jour de l'état interne
         self.current_state = {
             "position": new_state["position"],
-            "sees_enemy": int(bool(new_state["seesEnemy"]))
+            "sees_enemy": int(bool(new_state.get("seesEnemy", False)))
         }
 
         # Gestion du temps
         current_time = time.time()
         elapsed_time = current_time - self.start_time
 
+        # Calcul du temps écoulé depuis la dernière étape
+        delta_time = current_time - self.last_time if self.last_time else 0
+
         # Calcul de la récompense
         reward = 0
 
         # +1 point par seconde si le cube rouge voit le cube bleu
         if self.current_state["sees_enemy"]:
-            reward += 1
-            self.sees_enemy_duration += 1  # Compte le nombre de pas où l'ennemi est vu
+            reward += delta_time * 1.0  # 1.0 point par seconde
 
         # Vérifier si le cube bleu a été détruit
-        blue_destroyed = asyncio.run(self._check_collision())
+        blue_destroyed = self._check_collision()
         if blue_destroyed and not self.blue_destroyed:
             reward += 20  # +20 points pour l'élimination de l'ennemi
             self.blue_destroyed = True
@@ -108,13 +118,24 @@ class CustomEnv(gym.Env):
 
         self.total_reward += reward
 
+        # Mettre à jour le temps de la dernière étape
+        self.last_time = current_time
+
         return self.current_state, reward, self.done, {}
 
     def reset(self):
+        # Attendre que le cube bleu ait été réinitialisé
+        while True:
+            blue_destroyed = self._check_collision()
+            if not blue_destroyed:
+                break
+            time.sleep(0.1)  # Attendre 100 ms avant de vérifier à nouveau
+
         # Réinitialiser l'environnement
         self.current_state = {"position": {"x": 0.0, "y": 0.0, "z": 0.0}, "sees_enemy": 0}
         self.done = False
         self.start_time = time.time()
+        self.last_time = self.start_time  # Initialiser last_time ici
         self.total_reward = 0
         self.sees_enemy_duration = 0
         self.blue_destroyed = False
@@ -123,3 +144,7 @@ class CustomEnv(gym.Env):
     def render(self, mode="human"):
         # Optionnel : visualisation de l'état actuel
         print(f"Position : {self.current_state['position']}, Voit l'ennemi : {self.current_state['sees_enemy']}")
+
+    def close(self):
+        # Fermer la connexion WebSocket
+        self.ws.close()
