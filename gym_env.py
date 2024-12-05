@@ -101,12 +101,12 @@ class CustomEnv(gym.Env):
 
         # +1 point par seconde si le cube rouge voit le cube bleu
         if self.current_state["sees_enemy"]:
-            reward += delta_time * 1.0  # 1.0 point par seconde
+            reward += delta_time * 2.0  # 2.0 point par seconde
 
         # Vérifier si le cube bleu a été détruit
         blue_destroyed = self._check_collision()
         if blue_destroyed and not self.blue_destroyed:
-            reward += 20  # +20 points pour l'élimination de l'ennemi
+            reward += 30  # +30 points pour l'élimination de l'ennemi
             self.blue_destroyed = True
             self.done = True  # Fin de l'épisode si l'ennemi est détruit
 
@@ -114,7 +114,7 @@ class CustomEnv(gym.Env):
         if elapsed_time >= self.max_episode_duration:
             self.done = True
             if not self.blue_destroyed:
-                reward -= 20  # Pénalité pour l'échec de l'élimination
+                reward -= 5  # Pénalité pour l'échec de l'élimination
             self.ws.send(json.dumps({"type": "request_reset"}))
         self.total_reward += reward
 
