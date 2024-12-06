@@ -11,7 +11,7 @@ class CustomEnv(gym.Env):
         super(CustomEnv, self).__init__()
 
         # Actions possibles : avance, recule, tourne, saute
-        self.action_space = spaces.Discrete(5)  # 0: forward, 1: backward, 2: rotate_left, 3: rotate_right, 4: jump
+        self.action_space = spaces.Discrete(4)  # 0: forward, 1: backward, 2: rotate_left, 3: rotate_right, 4: jump //passé à 4 en retirant jump
 
         # Observation : position (x, y, z), vision (booléen si l'ennemi est visible)
         self.observation_space = spaces.Dict({
@@ -43,7 +43,6 @@ class CustomEnv(gym.Env):
             1: "backward",
             2: "rotate_left",
             3: "rotate_right",
-            4: "jump"
         }
         command = {
             "type": "moveCube",
@@ -93,32 +92,31 @@ class CustomEnv(gym.Env):
         current_time = time.time()
         elapsed_time = current_time - self.start_time
 
-        # Calcul du temps écoulé depuis la dernière étape
-        delta_time = current_time - self.last_time if self.last_time else 0
+        # Limitation à 20 étapes par seconde
+        if self.last_time:
+            sleep_duration = max(0, 0.05 - (current_time - self.last_time))  # 0.05s = 1/20
+            time.sleep(sleep_duration)
 
         # Calcul de la récompense
         reward = 0
 
-        # +1 point par seconde si le cube rouge voit le cube bleu
         if self.current_state["sees_enemy"]:
-            reward += delta_time * 2.0  # 2.0 point par seconde
+            reward += 2.0 * (current_time - self.last_time)
 
         # Vérifier si le cube bleu a été détruit
         blue_destroyed = self._check_collision()
         if blue_destroyed and not self.blue_destroyed:
-            reward += 30  # +30 points pour l'élimination de l'ennemi
+            reward += 30
             self.blue_destroyed = True
-            self.done = True  # Fin de l'épisode si l'ennemi est détruit
+            self.done = True
 
-        # Si l'épisode atteint sa durée maximale
         if elapsed_time >= self.max_episode_duration:
             self.done = True
             if not self.blue_destroyed:
-                reward -= 5  # Pénalité pour l'échec de l'élimination
+                reward -= 5
             self.ws.send(json.dumps({"type": "request_reset"}))
-        self.total_reward += reward
 
-        # Mettre à jour le temps de la dernière étape
+        self.total_reward += reward
         self.last_time = current_time
 
         return self.current_state, reward, self.done, {}
